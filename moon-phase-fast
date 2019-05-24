@@ -1,0 +1,3 @@
+#!/bin/bash
+
+emacs -q --batch -l $(dirname "${BASH_SOURCE[0]}")/moon.elc
