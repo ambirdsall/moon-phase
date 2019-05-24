@@ -1,0 +1,23 @@
+* Let's be honest
+The moon is pretty dope. Here's a script which writes the current phase of the moon (in emoji form)
+to stdout. I use it in my shell prompt, which I highly recommend per the first sentence of this
+paragraph.
+
+* to use it
+Just call the wrapper script, ~moon-phase~. I'd recommend symlinking it somewhere in your ~$PATH~, but
+you do you.
+
+The wrapper script directly calls the compiled file, which I'm just bundling in the repo. I don't
+know how portable elisp bytecode is, though: it's possible you'll have to crack open an emacs
+instance of your own and run ~byte-recompile-file~ on =moon.el=.
+
+* where the astronomical calculations came from
+This uses functions adapted from the =lunar.el= library included in emacs. That file only names phases
+to quarter moon precision, so I adapted it to split the lunar cycle into 8, not 4 (adding gibbous
+and crescent moons (both waxing and waning)) to match the precision of the moon phase emojis.
+
+* a note about macOS
+Macs come bundled with a version of emacs that is _ancient_. Problem is, this script is only
+compatible with emacs 24+ (I think: I wrote it using emacs 26). If you're on macOS and you don't
+know what sort of emacs you have, crack open a shell and run ~emacs --version~, followed by ~brew
+install emacs~ if needed.
