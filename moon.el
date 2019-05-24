@@ -1,65 +1,15 @@
-;; (lunar-phases) logs its business with (message) and in scripts, (message) prints to stderr.
-;; No thanks.
-(setq inhibit-message t)
+;;; -*- lexical-binding: t -*-
 
-(defun stdout (string &optional newline)
-  "Prints STRING to stdout, optionally appending a newline."
-  (princ string)
-  (and newline (princ "\n")))
+;; USAGE: emacs -q --batch -l moon.el
+;;
+;; Not compatible with emacs v22 (I think you need >= 24), so if you're on macOS, you may have to
+;; run `brew install emacs' or equivalent
 
-;; TODO: port calendar-extract-month for emacs 22 compatibility
+(defalias 'stdout 'princ)
+
 (require 'calendar)
 (require 'solar)
 (require 'cal-dst)
-
-;; seq functions adapted from seq.el (seq-24.el, to be specific); this library isn't included in
-;; emacs 22, which is the version that ships with macOS, so inlining the definitions makes this
-;; script more portable
-(defun seq-filter (predicate sequence)
-  "Return a list of all the elements for which (PREDICATE element) is non-nil in SEQUENCE."
-  (let ((exclude (make-symbol "exclude")))
-    (delq exclude (mapcar (lambda (elt)
-                             (if (funcall predicate elt)
-                                 elt
-                               exclude))
-                           sequence))))
-
-;; (defmacro seq-doseq (spec &rest body)
-;;   "Loop over a sequence.
-;; Similar to `dolist' but can be applied to lists, strings, and vectors.
-;; Evaluate BODY with VAR bound to each element of SEQ, in turn.
-;; \(fn (VAR SEQ) BODY...)"
-;;   (declare (indent 1) (debug ((symbolp form &optional form) body)))
-;;   (let ((length (make-symbol "length"))
-;;         (seq (make-symbol "seq"))
-;;         (index (make-symbol "index")))
-;;     `(let* ((,seq ,(cadr spec))
-;;             (,length (if (listp ,seq) nil (seq-length ,seq)))
-;;             (,index (if ,length 0 ,seq)))
-;;        (while (if ,length
-;;                   (< ,index ,length)
-;;                 (consp ,index))
-;;          (let ((,(car spec) (if ,length
-;;                                 (prog1 (seq-elt ,seq ,index)
-;;                                   (setq ,index (+ ,index 1)))
-;;                               (pop ,index))))
-;;            ,@body)))))
-
-(defun seq-find (predicate sequence &optional default)
-  "Return the first element for which (PREDICATE element) is non-nil in SEQUENCE.
-If no element is found, return DEFAULT.
-Note that `seq-find' has an ambiguity if the found element is
-identical to DEFAULT, as it cannot be known if an element was
-found or not."
-  (catch 'seq--break
-    (dolist (elt sequence)
-      (when (funcall predicate elt)
-        (throw 'seq--break elt)))
-    default))
-;; calendar-astro-to-absolute and v versa are cal-autoloads.
-;;;(require 'cal-julian)
-
-(setq lunar-phase-names '("New Moon" "Waxing Crescent Moon" "First Quarter Moon" "Waxing Gibbous Moon" "Full Moon" "Waning Gibbous Moon" "Last Quarter Moon" "Waning Crescent Moon"))
 
 (defun lunar-phase (index)
   "Local date and time of lunar phase INDEX.
@@ -158,7 +108,6 @@ list (DATE TIME PHASE)."
 (defconst lunar-cycles-per-year 12.3685 ; 365.25/29.530588853
   "Mean number of lunar cycles per 365.25 day year.")
 
-;; FIXME new-moon index; use in lunar-phase-list implies always below.
 (defun lunar-index (date)
   "Return the lunar index for Gregorian date DATE.
 This is 8 times the approximate number of new moons since 1 Jan 1900.
@@ -170,87 +119,6 @@ The factor of 8 allows (mod INDEX 8) to represent the eight phases."
               (/ (calendar-day-number date) 366.0)
               -1900)))))
 
-;; TODO: create alternate fn for this which only generates current phase
-(defun lunar-phase-list (month year)
-  "List of lunar phases for three months starting with Gregorian MONTH, YEAR."
-  (let* ((index (lunar-index (list month 1 year)))
-         (new-moon (lunar-phase index))
-         (end-date (let ((end-month month)
-                         (end-year year))
-                     (calendar-increment-month end-month end-year 3)
-                     (list (list end-month 1 end-year))))
-         ;; Alternative for start-date:
-;;;         (calendar-gregorian-from-absolute
-;;;          (1- (calendar-absolute-from-gregorian (list month 1 year))))
-         (start-date (progn
-                       (calendar-increment-month month year -1)
-                       (list (list month
-                                   (calendar-last-day-of-month month year)
-                                   year))))
-         list)
-    (while (calendar-date-compare new-moon end-date)
-      (if (calendar-date-compare start-date new-moon)
-          (setq list (append list (list new-moon))))
-      (setq index (1+ index)
-            new-moon (lunar-phase index)))
-    list))
-
-(defun lunar-phase-name (phase)
-  "Name of lunar PHASE.
-0 = new moon, 1 = first quarter, 2 = full moon, 3 = last quarter."
-  (message (concat "phase " (number-to-string phase) " in lunar-phase-name: " (nth phase lunar-phase-names)))
-  (nth phase lunar-phase-names))
-
-(defvar displayed-month)                ; from calendar-generate
-(defvar displayed-year)
-
-(defun calendar-lunar-phases (&optional event)
-  "Create a buffer with the lunar phases for the current calendar window.
-If EVENT is non-nil, it's an event indicating the buffer position to
-use instead of point."
-  (interactive (list last-nonmenu-event))
-  ;; If called from a menu, with the calendar window not selected.
-  (with-current-buffer
-      (if event (window-buffer (posn-window (event-start event)))
-        (current-buffer))
-    (message "Computing phases of the moon...")
-    (let ((m1 displayed-month)
-          (y1 displayed-year)
-          (m2 displayed-month)
-          (y2 displayed-year))
-      (calendar-increment-month m1 y1 -1)
-      (calendar-increment-month m2 y2 1)
-      (calendar-in-read-only-buffer lunar-phases-buffer
-       (calendar-set-mode-line
-         (if (= y1 y2)
-             (format "Phases of the Moon from %s to %s, %d%%-"
-                     (calendar-month-name m1) (calendar-month-name m2) y2)
-           (format "Phases of the Moon from %s, %d to %s, %d%%-"
-                   (calendar-month-name m1) y1 (calendar-month-name m2) y2)))
-        (insert
-         (mapconcat
-          (lambda (x)
-            (format "%s: %s %s" (calendar-date-string (car x))
-                    (lunar-phase-name (nth 2 x))
-                    (cadr x)))
-          (lunar-phase-list m1 y1) "\n")))
-      (message "Computing phases of the moon...done"))))
-
-(defun lunar-phases (&optional arg)
-  "Display the quarters of the moon for last month, this month, and next month.
-If called with an optional prefix argument ARG, prompts for month and year.
-This function is suitable for execution in an init file."
-  (interactive "P")
-  (save-excursion
-    (let* ((date (if arg (calendar-read-date t)
-                   (calendar-current-date)))
-           (displayed-month (calendar-extract-month date))
-           (displayed-year (calendar-extract-year date)))
-      (calendar-lunar-phases))))
-
-(defvar date)
-
-
 (setq phase-emojis '(("New" . "🌑")
                      ("Waxing Crescent" . "🌒")
                      ("First Quarter" . "🌓")
@@ -260,49 +128,23 @@ This function is suitable for execution in an init file."
                      ("Last Quarter" . "🌗")
                      ("Waning Crescent" . "🌘")))
 
-(lunar-phases)
-(switch-to-buffer "*Phases of Moon*")
-
-;; seems like it should work, but giving incorrect result:
-;; (lunar-phase-name (nth 2 (lunar-phase (lunar-index (calendar-current-date)))))
-
 (let* ((date (calendar-current-date))
-       (year (number-to-string (calendar-extract-year date)))
-       (current-month (calendar-month-name (calendar-extract-month date)))
-       (last-month (calendar-month-name (1- (calendar-extract-month date))))
-       (current-day (number-to-string (calendar-extract-day (calendar-current-date))))
+       (offset-from-last-new-moon 0)
+       (current-phase-index)
+       (current-phase-emoji))
 
-       (phase-list (split-string (buffer-string) "\n"))
-       ;; TODO interpolate dates to add in waxing/waning crescent/gibbous
-       (current-month-phases (seq-filter (lambda (phase-string)
-                                           (string-match current-month phase-string))
-                                         phase-list))
-       (current-phase-with-date (or
-                                 ;; maybe today is one of the listed dates?
-                                 (seq-find (lambda (phase)
-                                             (let ((date-matcher (concat " " current-day ", " year)))
-                                               (string-match date-matcher phase)))
-                                           current-month-phases)
+  ;; increment the ofset until it corresponds to the next phase from now;
+  ;; i.e. until it's one too many
+  (while (calendar-date-compare (lunar-phase (+ offset-from-last-new-moon (lunar-index date)))
+                                (list date))
+    (setq offset-from-last-new-moon (1+ offset-from-last-new-moon)))
 
-                                 ;; if not, maybe the last-specified phase was this month?
-                                 (let ((earlier-phases-this-month
-                                        (seq-filter (lambda (phase)
-                                                      (let ((phase-date (string-to-number
-                                                                         (and (string-match "[0-9]+" phase)
-                                                                              (match-string 0 phase)))))
-                                                        (< phase-date (string-to-number current-day))))
-                                                    current-month-phases)))
-                                   (car (last earlier-phases-this-month)))
+  ;; correct the off-by-one error
+  (setq offset-from-last-new-moon (1- offset-from-last-new-moon))
 
-                                 ;; if not, get last phase of last month
-                                 (car (last (seq-filter (lambda (phase-string)
-                                                          (string-match last-month phase-string))
-                                                        phase-list)))
-                                 ))
+  ;; extract the current phase and look up the corresponding emoji
+  (setq current-phase-index (nth 2 (lunar-phase (+ offset-from-last-new-moon (lunar-index (calendar-current-date))))))
+  (setq current-phase-emoji (cdr (nth current-phase-index phase-emojis)))
 
-       (current-phase-name (substring (car (split-string
-                                            (cadr (split-string current-phase-with-date ":"))
-                                            " Moon"))
-                                      1))
-       (current-phase (cdr (assoc current-phase-name phase-emojis))))
-  (stdout current-phase))
+  ;; and shout that shit to the world
+  (stdout current-phase-emoji))
