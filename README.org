@@ -25,8 +25,4 @@ know what sort of emacs you have, crack open a shell and run ~emacs --version~, 
 install emacs~ if needed.
 
 * next steps
-The problem with =lunar.el= in the first place (besides only quarter-moon precision, which isn't that
-big of a deal) is that it's hardcoded to specific use cases with emacs' calendar and diary, and has
-no general-purpose API. This is also the case with this repo at the moment. It wouldn't be that hard
-to extract a general-purpose "get the moon phase and/or emoji for any arbitrary date" function from
-the code in here: if that sounds fun, please do clone it down and open a PR!
+It would be cool to expand this into a patch for =lunar.el= adding this functionality for all emacs users.

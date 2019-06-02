@@ -1,7 +1,8 @@
 #!/bin/sh
 ":"; exec emacs --quick --script "$0" # -*- mode: emacs-lisp; lexical-binding: t; -*-
 
-;; USAGE: emacs -q --batch -l moon.el
+;; USAGE: moon-phase
+;;        really, though, just put in your shell prompt
 ;;
 ;; Not compatible with emacs v22 (I think you need >= 24), so if you're on macOS, you may have to
 ;; run `brew install emacs' or equivalent
@@ -120,7 +121,7 @@ The factor of 8 allows (mod INDEX 8) to represent the eight phases."
               (/ (calendar-day-number date) 366.0)
               -1900)))))
 
-(setq phase-emojis '(("New" . "🌑")
+(setq lunar-phase-emojis '(("New" . "🌑")
                      ("Waxing Crescent" . "🌒")
                      ("First Quarter" . "🌓")
                      ("Waxing Gibbous" . "🌔")
@@ -129,23 +130,26 @@ The factor of 8 allows (mod INDEX 8) to represent the eight phases."
                      ("Last Quarter" . "🌗")
                      ("Waning Crescent" . "🌘")))
 
-(let* ((date (calendar-current-date))
-       (offset-from-last-new-moon 0)
-       (current-phase-index)
-       (current-phase-emoji))
+(defun lunar-phase-for-date (date)
+  "Return the phase of the moon for Gregorian date DATE.
+The phase is represented as a (title . emoji) cons cell."
+  (let ((offset-from-last-new-moon 0)
+	(current-phase-index)
+	(current-phase))
 
-  ;; increment the ofset until it corresponds to the next phase from now;
-  ;; i.e. until it's one too many
-  (while (calendar-date-compare (lunar-phase (+ offset-from-last-new-moon (lunar-index date)))
-                                (list date))
-    (setq offset-from-last-new-moon (1+ offset-from-last-new-moon)))
+    ;; increment the offset until it corresponds to the next phase from now;
+    ;; easiest to detect when it's one too many
+    (while (calendar-date-compare (lunar-phase (+ offset-from-last-new-moon (lunar-index date)))
+				  (list date))
+      (setq offset-from-last-new-moon (1+ offset-from-last-new-moon)))
 
-  ;; correct the off-by-one error
-  (setq offset-from-last-new-moon (1- offset-from-last-new-moon))
+    ;; correct the off-by-one error
+    (setq offset-from-last-new-moon (1- offset-from-last-new-moon))
 
-  ;; extract the current phase and look up the corresponding emoji
-  (setq current-phase-index (nth 2 (lunar-phase (+ offset-from-last-new-moon (lunar-index (calendar-current-date))))))
-  (setq current-phase-emoji (cdr (nth current-phase-index phase-emojis)))
+    ;; extract the current phase and look up the corresponding emoji
+    (setq current-phase-index (nth 2 (lunar-phase (+ offset-from-last-new-moon (lunar-index (calendar-current-date))))))
+    (setq current-phase (nth current-phase-index lunar-phase-emojis))))
 
-  ;; and shout that shit to the world
+(let* ((current-phase (lunar-phase-for-date (calendar-current-date)))
+       (current-phase-emoji (cdr current-phase)))
   (stdout current-phase-emoji))
